@@ -29,9 +29,7 @@ RESULTS = '/home/blu/Cartoons/MODELS _natural/results'
 
 NUM_CLASSES = 2
 
-BATCH_SIZE = 16
-
-NUM_EPOCHS = 200
+BATCH_SIZE = 1
 
 INPUT_SIZE = 224
 
@@ -39,90 +37,51 @@ MODEL_NAME = 'CNN'
 
 EXTRA_NAME = 'test_natural_trained_natural'
 
-EARLY_STOP = False
-
-STOP_AT = .99
-
-FEATURE_EXTRACT = False
-
-PRETRAIN = False
-
-LOAD = False
+LOAD = True
 
 ft_size = ((round(INPUT_SIZE/4)) +1) * ((round(INPUT_SIZE/4)) +1) * 32
 ##############################################################################
-model_best = []
-def train_model(model, dataloaders, criterion, optimizer, NUM_EPOCHS=NUM_EPOCHS, is_inception=False):
-    since = time.time()
 
-    val_acc_history = []
-    train_acc = []
-    train_loss = []
-    val_loss = []
+since = time.time()
+best_model_wts = copy.deepcopy(model.state_dict())
+best_acc = 0.0
 
-    best_model_wts = copy.deepcopy(model.state_dict())
-    best_acc = 0.0
 
-    for epoch in range(NUM_EPOCHS):
-        print('Epoch {}/{}'.format(epoch, NUM_EPOCHS - 1))
-        print('-' * 10)
+model.eval()   # Set model to evaluate mode
 
-        # Each epoch has a training and validation phase
-        for phase in ['train', 'val']:
-            if (epoch % 2) != 0:
-                continue
-            if phase == 'train':
-                model.train()  # Set model to training mode
-            else:
-                model.eval()   # Set model to evaluate mode
-
-            running_loss = 0.0
-            running_corrects = 0
+running_loss = 0.0
+running_corrects = 0
 
             # Iterate over data.
-            for inputs, labels in dataloaders[phase]:
-                inputs = inputs.to(device)
-                labels = labels.to(device)
+for inputs, labels in dataloaders[phase]:
+    inputs = inputs.to(device)
+    labels = labels.to(device)
 
-                # zero the parameter gradients
-                optimizer.zero_grad()
+    outputs = model(inputs)
+    loss = criterion(outputs, labels)
+    _, preds = torch.max(outputs, 1)
 
-                # forward
-                # track history if only in train
-                with torch.set_grad_enabled(phase == 'train'):
-                    if is_inception and phase == 'train':
-                        outputs, aux_outputs = model(inputs)
-                        loss1 = criterion(outputs, labels)
-                        loss2 = criterion(aux_outputs, labels)
-                        loss = loss1 + 0.4*loss2
-                    else:
-                        outputs = model(inputs)
-                        loss = criterion(outputs, labels)
-                    _, preds = torch.max(outputs, 1)
-                    if phase == 'train':
-                        loss.backward()
-                        optimizer.step()
-                running_loss += loss.item() * inputs.size(0)
-                running_corrects += torch.sum(preds == labels.data)
-            epoch_loss = running_loss / len(dataloaders[phase].dataset)
-            epoch_acc = running_corrects.double() / len(dataloaders[phase].dataset)
-            if phase == 'train':
-                train_acc.append(epoch_acc.cpu().numpy())
-                vis.line(train_acc, win='train_acc', opts=dict(title= MODEL_NAME + '-train_acc'))
-                train_loss.append(epoch_loss)
-                vis.line(train_loss, win='train_loss', opts=dict(title= MODEL_NAME + '-train_loss'))
-            print('{} Loss: {:.4f} Acc: {:.4f}'.format(phase, epoch_loss, epoch_acc))
-            if phase == 'val' and epoch_acc > best_acc:
-                best_acc = epoch_acc
-                best_model_wts = copy.deepcopy(model.state_dict())
-            if phase == 'val':
-                val_acc_history.append(epoch_acc.cpu().numpy())
-                vis.line(val_acc_history, win='val_acc', opts=dict(title= MODEL_NAME + '-val_acc'))
-                val_loss.append(epoch_loss)
-                vis.line(val_loss, win='val_loss', opts=dict(title= MODEL_NAME + '-val_loss'))
-        if EARLY_STOP:
-            if best_acc >= STOP_AT:
-                break
+    running_loss += loss.item() * inputs.size(0)
+    running_corrects += torch.sum(preds == labels.data)
+epoch_loss = running_loss / len(dataloaders[phase].dataset)
+epoch_acc = running_corrects.double() / len(dataloaders[phase].dataset)
+if phase == 'train':
+    train_acc.append(epoch_acc.cpu().numpy())
+    vis.line(train_acc, win='train_acc', opts=dict(title= MODEL_NAME + '-train_acc'))
+    train_loss.append(epoch_loss)
+    vis.line(train_loss, win='train_loss', opts=dict(title= MODEL_NAME + '-train_loss'))
+print('{} Loss: {:.4f} Acc: {:.4f}'.format(phase, epoch_loss, epoch_acc))
+if phase == 'val' and epoch_acc > best_acc:
+    best_acc = epoch_acc
+    best_model_wts = copy.deepcopy(model.state_dict())
+if phase == 'val':
+    val_acc_history.append(epoch_acc.cpu().numpy())
+    vis.line(val_acc_history, win='val_acc', opts=dict(title= MODEL_NAME + '-val_acc'))
+    val_loss.append(epoch_loss)
+    vis.line(val_loss, win='val_loss', opts=dict(title= MODEL_NAME + '-val_loss'))
+if EARLY_STOP:
+if best_acc >= STOP_AT:
+    break
 
     time_elapsed = time.time() - since
     print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
